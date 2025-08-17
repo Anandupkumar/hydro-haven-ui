@@ -3,8 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Droplets, Phone, Shield } from "lucide-react";
+import { Droplets, Phone, Shield, ArrowLeft } from "lucide-react";
 import waterDroplet from "@/assets/water-droplet.jpg";
 
 interface LoginPageProps {
@@ -15,7 +14,7 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtp, setShowOtp] = useState(false);
-  const [userType, setUserType] = useState<"user" | "vendor">("user");
+  const [loginType, setLoginType] = useState<"user" | "vendor">("user");
 
   const handleSendOtp = () => {
     if (phone.trim()) {
@@ -27,14 +26,24 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
 
   const handleVerifyOtp = () => {
     if (otp.trim()) {
-      onLogin(userType, phone);
+      onLogin(loginType, phone);
     }
   };
 
-  const handleTabChange = (value: string) => {
-    setUserType(value as "user" | "vendor");
+  const resetForm = () => {
     setShowOtp(false);
     setOtp("");
+    setPhone("");
+  };
+
+  const switchToVendor = () => {
+    setLoginType("vendor");
+    resetForm();
+  };
+
+  const switchToUser = () => {
+    setLoginType("user");
+    resetForm();
   };
 
   return (
@@ -65,32 +74,29 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
         {/* Login Card */}
         <Card className="glass-card ripple-effect">
           <CardHeader className="text-center">
-            <CardTitle className="text-primary-deep">Welcome Back</CardTitle>
+            {loginType === "vendor" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={switchToUser}
+                className="absolute left-4 top-4"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            )}
+            <CardTitle className="text-primary-deep">
+              {loginType === "user" ? "Customer Login" : "Vendor Login"}
+            </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Sign in to your account to continue
+              {loginType === "user" 
+                ? "Order fresh water delivered to your doorstep"
+                : "Manage your water delivery business"
+              }
             </p>
           </CardHeader>
           
           <CardContent className="space-y-6">
-            {/* User Type Tabs */}
-            <Tabs value={userType} onValueChange={handleTabChange}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="user">Customer</TabsTrigger>
-                <TabsTrigger value="vendor">Vendor</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="user" className="space-y-4 mt-6">
-                <div className="text-center text-sm text-muted-foreground">
-                  Order fresh water delivered to your doorstep
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="vendor" className="space-y-4 mt-6">
-                <div className="text-center text-sm text-muted-foreground">
-                  Manage your water delivery business
-                </div>
-              </TabsContent>
-            </Tabs>
 
             {/* Phone Input */}
             {!showOtp ? (
@@ -165,6 +171,22 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
                 <p>Use any phone number and OTP "123456"</p>
               </div>
             </div>
+
+            {/* Vendor login link for users */}
+            {loginType === "user" && (
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  Are you a vendor?{" "}
+                  <Button
+                    variant="link"
+                    onClick={switchToVendor}
+                    className="p-0 h-auto text-primary underline"
+                  >
+                    Login here
+                  </Button>
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

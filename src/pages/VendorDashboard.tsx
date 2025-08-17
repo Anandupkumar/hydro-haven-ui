@@ -18,6 +18,10 @@ import {
   Truck
 } from "lucide-react";
 
+interface VendorDashboardProps {
+  onLogout: () => void;
+}
+
 // Mock vendor data
 const vendorStats = {
   totalOrders: 156,
@@ -77,7 +81,7 @@ const statusIcons = {
   delivered: CheckCircle
 };
 
-export const VendorDashboard = () => {
+export const VendorDashboard = ({ onLogout }: VendorDashboardProps) => {
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 

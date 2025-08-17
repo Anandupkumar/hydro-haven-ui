@@ -22,10 +22,10 @@ const Index = () => {
   }
 
   if (currentUser.type === "vendor") {
-    return <VendorDashboard />;
+    return <VendorDashboard onLogout={handleLogout} />;
   }
 
-  return <UserApp />;
+  return <UserApp onLogout={handleLogout} />;
 };
 
 export default Index;

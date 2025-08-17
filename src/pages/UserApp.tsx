@@ -1,12 +1,21 @@
 import { useState } from "react";
-import { Header } from "@/components/Header";
-import { WaterProductCard } from "@/components/WaterProductCard";
-import { OrderStatusTracker } from "@/components/OrderStatusTracker";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Droplets, Clock, CheckCircle, Package } from "lucide-react";
-import heroImage from "@/assets/water-bottle-hero.jpg";
+import { WaterProductCard } from "@/components/WaterProductCard";
+import { OrderStatusTracker } from "@/components/OrderStatusTracker";
+import { Header } from "@/components/Header";
+import { Droplets, ShoppingCart, Clock, MapPin, Phone, User, Package, Settings, LogOut } from "lucide-react";
+import waterBottleHero from "@/assets/water-bottle-hero.jpg";
+import waterContainers from "@/assets/water-containers.jpg";
+
+interface UserAppProps {
+  onLogout: () => void;
+}
 
 // Mock data
 const waterProducts = [
@@ -35,7 +44,7 @@ const mockOrders = [
   }
 ];
 
-export const UserApp = () => {
+export const UserApp = ({ onLogout }: UserAppProps) => {
   const [cartItems, setCartItems] = useState<Array<{id: string, quantity: number}>>([]);
   const [activeTab, setActiveTab] = useState("products");
 
@@ -69,7 +78,7 @@ export const UserApp = () => {
         <section className="relative overflow-hidden rounded-3xl glass-card h-64 md:h-80">
           <div className="absolute inset-0">
             <img 
-              src={heroImage} 
+              src={waterBottleHero} 
               alt="Pure water delivery" 
               className="w-full h-full object-cover opacity-20"
             />
