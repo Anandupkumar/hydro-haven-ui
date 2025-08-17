@@ -9,15 +9,18 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "ocean-gradient text-primary-foreground ripple-effect hover:shadow-lg",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border border-primary/30 bg-background/50 backdrop-blur-sm hover:bg-primary/10 hover:border-primary/50 hover:text-primary-deep",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-secondary/80 text-secondary-foreground hover:bg-secondary ripple-effect",
+        ghost: "hover:bg-accent/50 hover:text-accent-foreground water-flow",
+        link: "text-primary underline-offset-4 hover:underline hover:text-primary-deep",
+        glass: "glass-card text-primary hover:bg-primary/10 ripple-effect",
+        wave: "wave-gradient text-white hover:scale-105 water-flow shadow-lg",
+        flow: "bg-gradient-to-r from-primary to-primary-glow text-white hover:from-primary-glow hover:to-primary ripple-effect",
       },
       size: {
         default: "h-10 px-4 py-2",
