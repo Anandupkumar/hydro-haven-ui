@@ -1,32 +1,50 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Droplets, Phone, Shield, ArrowLeft } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import waterDroplet from "@/assets/water-droplet.jpg";
 
-interface LoginPageProps {
-  onLogin: (userType: "user" | "vendor", phone: string) => void;
-}
-
-export const LoginPage = ({ onLogin }: LoginPageProps) => {
+export const LoginPage = () => {
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [showOtp, setShowOtp] = useState(false);
   const [loginType, setLoginType] = useState<"user" | "vendor">("user");
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const { login, sendOTP } = useAuth();
+  const navigate = useNavigate();
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
     if (phone.trim()) {
-      setShowOtp(true);
-      // Mock OTP sent
-      console.log("OTP sent to:", phone);
+      try {
+        setIsLoading(true);
+        setError("");
+        await sendOTP(phone, loginType);
+        setShowOtp(true);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to send OTP");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
-  const handleVerifyOtp = () => {
+  const handleVerifyOtp = async () => {
     if (otp.trim()) {
-      onLogin(loginType, phone);
+      try {
+        setIsLoading(true);
+        setError("");
+        await login(loginType, phone, otp);
+        // Navigation will be handled by the auth context
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Invalid OTP");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -120,10 +138,10 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
                   onClick={handleSendOtp}
                   variant="flow"
                   className="w-full"
-                  disabled={!phone.trim()}
+                  disabled={!phone.trim() || isLoading}
                 >
                   <Shield className="w-4 h-4 mr-2" />
-                  Send OTP
+                  {isLoading ? "Sending..." : "Send OTP"}
                 </Button>
               </div>
             ) : (
@@ -148,9 +166,9 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
                     onClick={handleVerifyOtp}
                     variant="flow"
                     className="w-full"
-                    disabled={!otp.trim()}
+                    disabled={!otp.trim() || isLoading}
                   >
-                    Verify & Login
+                    {isLoading ? "Verifying..." : "Verify & Login"}
                   </Button>
                   
                   <Button 
@@ -164,13 +182,15 @@ export const LoginPage = ({ onLogin }: LoginPageProps) => {
               </div>
             )}
 
-            {/* Mock credentials info */}
-            <div className="text-center">
-              <div className="text-xs text-muted-foreground p-3 bg-accent/20 rounded-lg">
-                <p className="font-medium">Demo Mode</p>
-                <p>Use any phone number and OTP "123456"</p>
+            {/* Error Display */}
+            {error && (
+              <div className="text-center">
+                <div className="text-xs text-red-600 p-3 bg-red-50 rounded-lg border border-red-200">
+                  <p className="font-medium">Error</p>
+                  <p>{error}</p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Vendor login link for users */}
             {loginType === "user" && (

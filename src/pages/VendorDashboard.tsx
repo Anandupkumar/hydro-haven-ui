@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,64 +16,11 @@ import {
   MapPin,
   Clock,
   CheckCircle,
-  Truck
+  Truck,
+  LogOut
 } from "lucide-react";
-
-interface VendorDashboardProps {
-  onLogout: () => void;
-}
-
-// Mock vendor data
-const vendorStats = {
-  totalOrders: 156,
-  activeCustomers: 42,
-  todayDeliveries: 8,
-  revenue: 12500
-};
-
-const mockCustomers = [
-  {
-    id: "1",
-    name: "Priya Sharma",
-    phone: "+91 98765 43210",
-    address: "123 Green Valley Apartments, Sector 15",
-    totalOrders: 15,
-    lastOrder: "2 days ago",
-    status: "active"
-  },
-  {
-    id: "2", 
-    name: "Raj Kumar",
-    phone: "+91 87654 32109",
-    address: "456 Blue Hills Society, Sector 22",
-    totalOrders: 8,
-    lastOrder: "1 week ago",
-    status: "active"
-  }
-];
-
-const mockOrders = [
-  {
-    id: "ORD-001",
-    customer: "Priya Sharma",
-    phone: "+91 98765 43210",
-    items: "2x Pure Spring Water (5L)",
-    amount: 50,
-    status: "arriving",
-    orderTime: "2 hours ago",
-    address: "123 Green Valley Apartments"
-  },
-  {
-    id: "ORD-002",
-    customer: "Raj Kumar", 
-    phone: "+91 87654 32109",
-    items: "1x Mineral Water (10L)",
-    amount: 45,
-    status: "processing",
-    orderTime: "4 hours ago",
-    address: "456 Blue Hills Society"
-  }
-];
+import { useAuth } from "@/hooks/useAuth";
+import { apiClient, VendorStats, Order, User } from "@/services/api";
 
 const statusIcons = {
   booked: Package,
@@ -81,24 +29,75 @@ const statusIcons = {
   delivered: CheckCircle
 };
 
-export const VendorDashboard = ({ onLogout }: VendorDashboardProps) => {
+export const VendorDashboard = () => {
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [vendorStats, setVendorStats] = useState<VendorStats>({
+    totalOrders: 0,
+    activeCustomers: 0,
+    todayDeliveries: 0,
+    revenue: 0
+  });
+  const [customers, setCustomers] = useState<User[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { vendor, logout } = useAuth();
+  const navigate = useNavigate();
 
-  const handleAddCustomer = () => {
-    if (newCustomerPhone.trim()) {
-      console.log("Adding customer:", newCustomerPhone);
-      setNewCustomerPhone("");
+  useEffect(() => {
+    if (!vendor) {
+      navigate('/login');
+      return;
+    }
+    loadData();
+  }, [vendor, navigate]);
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [statsData, customersData, ordersData] = await Promise.all([
+        apiClient.getVendorDashboard(),
+        apiClient.getVendorCustomers(),
+        apiClient.getVendorOrders()
+      ]);
+      setVendorStats(statsData);
+      setCustomers(customersData);
+      setOrders(ordersData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleStatusUpdate = (orderId: string, newStatus: string) => {
-    console.log("Updating order", orderId, "to", newStatus);
+  const handleAddCustomer = async () => {
+    if (newCustomerPhone.trim()) {
+      try {
+        await apiClient.registerCustomer(newCustomerPhone);
+        setNewCustomerPhone("");
+        // Reload customers data
+        const customersData = await apiClient.getVendorCustomers();
+        setCustomers(customersData);
+      } catch (error) {
+        console.error('Error adding customer:', error);
+      }
+    }
   };
 
-  const filteredOrders = mockOrders.filter(order => 
-    order.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.id.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    try {
+      await apiClient.updateOrderStatus(parseInt(orderId), newStatus);
+      // Reload orders data
+      const ordersData = await apiClient.getVendorOrders();
+      setOrders(ordersData);
+    } catch (error) {
+      console.error('Error updating order status:', error);
+    }
+  };
+
+  const filteredOrders = orders.filter(order => 
+    (order.customer_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.order_number.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -111,9 +110,15 @@ export const VendorDashboard = ({ onLogout }: VendorDashboardProps) => {
               <h1 className="text-2xl font-bold text-primary-deep">Vendor Dashboard</h1>
               <p className="text-muted-foreground">Manage your water delivery business</p>
             </div>
-            <Badge variant="outline" className="ocean-gradient text-white border-none">
-              Active Vendor
-            </Badge>
+            <div className="flex items-center gap-4">
+              <Badge variant="outline" className="ocean-gradient text-white border-none">
+                Active Vendor
+              </Badge>
+              <Button variant="destructive" size="sm" onClick={logout}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -205,62 +210,77 @@ export const VendorDashboard = ({ onLogout }: VendorDashboardProps) => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {filteredOrders.map((order) => {
-                    const StatusIcon = statusIcons[order.status as keyof typeof statusIcons];
-                    return (
-                      <Card key={order.id} className="border border-border/50 hover:border-primary/30 transition-colors">
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="space-y-2">
-                              <div className="flex items-center space-x-3">
-                                <Badge variant="outline" className="text-xs">
-                                  {order.id}
-                                </Badge>
-                                <h3 className="font-medium text-primary-deep">{order.customer}</h3>
+                  {isLoading ? (
+                    <div className="text-center py-12">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                      <p className="mt-4 text-muted-foreground">Loading orders...</p>
+                    </div>
+                  ) : filteredOrders.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">No orders found</h3>
+                      <p className="text-muted-foreground">Orders will appear here when customers place them</p>
+                    </div>
+                  ) : (
+                    filteredOrders.map((order) => {
+                      const StatusIcon = statusIcons[order.status as keyof typeof statusIcons];
+                      return (
+                        <Card key={order.id} className="border border-border/50 hover:border-primary/30 transition-colors">
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="space-y-2">
+                                <div className="flex items-center space-x-3">
+                                  <Badge variant="outline" className="text-xs">
+                                    {order.order_number}
+                                  </Badge>
+                                  <h3 className="font-medium text-primary-deep">{order.customer_name || 'Unknown Customer'}</h3>
+                                </div>
+                                <p className="text-sm text-muted-foreground flex items-center">
+                                  <MapPin className="h-3 w-3 mr-1" />
+                                  {order.delivery_address || 'Address not provided'}
+                                </p>
+                                <p className="text-sm">
+                                  {order.items.map(item => 
+                                    `${item.quantity}x ${item.product_name || 'Product'} (${item.product_size || 'Standard'})`
+                                  ).join(', ')}
+                                </p>
                               </div>
-                              <p className="text-sm text-muted-foreground flex items-center">
-                                <Phone className="h-3 w-3 mr-1" />
-                                {order.phone}
-                              </p>
-                              <p className="text-sm text-muted-foreground flex items-center">
-                                <MapPin className="h-3 w-3 mr-1" />
-                                {order.address}
-                              </p>
-                              <p className="text-sm">{order.items}</p>
-                            </div>
-                            
-                            <div className="text-right space-y-2">
-                              <p className="font-semibold text-primary">₹{order.amount}</p>
-                              <p className="text-xs text-muted-foreground">{order.orderTime}</p>
-                              <div className="flex items-center space-x-2">
-                                <StatusIcon className="h-4 w-4 text-primary" />
-                                <Badge 
-                                  variant={order.status === "delivered" ? "default" : "secondary"}
-                                  className={order.status === "delivered" ? "bg-green-500" : ""}
-                                >
-                                  {order.status}
-                                </Badge>
+                              
+                              <div className="text-right space-y-2">
+                                <p className="font-semibold text-primary">₹{order.total_amount}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(order.created_at).toLocaleDateString()}
+                                </p>
+                                <div className="flex items-center space-x-2">
+                                  <StatusIcon className="h-4 w-4 text-primary" />
+                                  <Badge 
+                                    variant={order.status === "delivered" ? "default" : "secondary"}
+                                    className={order.status === "delivered" ? "bg-green-500" : ""}
+                                  >
+                                    {order.status}
+                                  </Badge>
+                                </div>
+                                {order.status !== "delivered" && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => {
+                                      const nextStatus = order.status === "booked" ? "processing" 
+                                        : order.status === "processing" ? "arriving" 
+                                        : "delivered";
+                                      handleStatusUpdate(order.id.toString(), nextStatus);
+                                    }}
+                                  >
+                                    Update Status
+                                  </Button>
+                                )}
                               </div>
-                              {order.status !== "delivered" && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline"
-                                  onClick={() => {
-                                    const nextStatus = order.status === "booked" ? "processing" 
-                                      : order.status === "processing" ? "arriving" 
-                                      : "delivered";
-                                    handleStatusUpdate(order.id, nextStatus);
-                                  }}
-                                >
-                                  Update Status
-                                </Button>
-                              )}
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
+                          </CardContent>
+                        </Card>
+                      );
+                    })
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -299,27 +319,40 @@ export const VendorDashboard = ({ onLogout }: VendorDashboardProps) => {
                 <CardTitle className="text-primary-deep">Customer List</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockCustomers.map((customer) => (
-                    <Card key={customer.id} className="border border-border/50">
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="space-y-1">
-                            <h3 className="font-medium text-primary-deep">{customer.name}</h3>
-                            <p className="text-sm text-muted-foreground">{customer.phone}</p>
-                            <p className="text-sm text-muted-foreground">{customer.address}</p>
+                {isLoading ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                    <p className="mt-4 text-muted-foreground">Loading customers...</p>
+                  </div>
+                ) : customers.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Users className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-medium mb-2">No customers yet</h3>
+                    <p className="text-muted-foreground">Customers will appear here when they register</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {customers.map((customer) => (
+                      <Card key={customer.id} className="border border-border/50">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                              <h3 className="font-medium text-primary-deep">{customer.name || 'Unknown Customer'}</h3>
+                              <p className="text-sm text-muted-foreground">{customer.phone}</p>
+                              <p className="text-sm text-muted-foreground">{customer.address || 'Address not provided'}</p>
+                            </div>
+                            <div className="text-right space-y-1">
+                              <Badge variant="outline" className="ocean-gradient text-white border-none">
+                                Active Customer
+                              </Badge>
+                              <p className="text-xs text-muted-foreground">ID: {customer.id}</p>
+                            </div>
                           </div>
-                          <div className="text-right space-y-1">
-                            <Badge variant="outline" className="ocean-gradient text-white border-none">
-                              {customer.totalOrders} orders
-                            </Badge>
-                            <p className="text-xs text-muted-foreground">Last: {customer.lastOrder}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

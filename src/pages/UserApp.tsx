@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -10,43 +11,43 @@ import { WaterProductCard } from "@/components/WaterProductCard";
 import { OrderStatusTracker } from "@/components/OrderStatusTracker";
 import { Header } from "@/components/Header";
 import { Droplets, ShoppingCart, Clock, MapPin, Phone, User, Package, Settings, LogOut } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { apiClient, Product, Order } from "@/services/api";
 import waterBottleHero from "@/assets/water-bottle-hero.jpg";
 import waterContainers from "@/assets/water-containers.jpg";
 
-interface UserAppProps {
-  onLogout: () => void;
-}
-
-// Mock data
-const waterProducts = [
-  { id: "1", name: "Pure Spring Water", size: "5L", price: 25, available: true },
-  { id: "2", name: "Mineral Water", size: "10L", price: 45, available: true },
-  { id: "3", name: "Premium Water", size: "20L", price: 80, available: true },
-  { id: "4", name: "Alkaline Water", size: "5L", price: 35, available: false },
-];
-
-const mockOrders = [
-  {
-    id: "ORD-001",
-    status: "arriving" as const,
-    timestamp: "2 hours ago",
-    estimatedDelivery: "Today, 4:00 PM",
-    items: [{ name: "Pure Spring Water", size: "5L", quantity: 2 }],
-    total: 50
-  },
-  {
-    id: "ORD-002", 
-    status: "delivered" as const,
-    timestamp: "Yesterday",
-    estimatedDelivery: "",
-    items: [{ name: "Mineral Water", size: "10L", quantity: 1 }],
-    total: 45
-  }
-];
-
-export const UserApp = ({ onLogout }: UserAppProps) => {
+export const UserApp = () => {
   const [cartItems, setCartItems] = useState<Array<{id: string, quantity: number}>>([]);
   const [activeTab, setActiveTab] = useState("products");
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    loadData();
+  }, [user, navigate]);
+
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [productsData, ordersData] = await Promise.all([
+        apiClient.getVendorProducts(),
+        apiClient.getUserOrders()
+      ]);
+      setProducts(productsData);
+      setOrders(ordersData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleAddToOrder = (productId: string, quantity: number) => {
     setCartItems(prev => {
@@ -67,7 +68,7 @@ export const UserApp = ({ onLogout }: UserAppProps) => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-accent/10">
       <Header 
-        userName="Priya Sharma"
+        userName={user?.name || "User"}
         onProfileClick={() => setActiveTab("profile")}
         onCartClick={() => setActiveTab("orders")}
         cartItemCount={totalCartItems}
@@ -127,39 +128,73 @@ export const UserApp = ({ onLogout }: UserAppProps) => {
 
           {/* Products Tab */}
           <TabsContent value="products" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {waterProducts.map((product) => (
-                <WaterProductCard
-                  key={product.id}
-                  {...product}
-                  onAddToOrder={handleAddToOrder}
-                />
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">Loading products...</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {products.map((product) => (
+                  <WaterProductCard
+                    key={product.id}
+                    id={product.id.toString()}
+                    name={product.name}
+                    size={product.size}
+                    price={product.price}
+                    available={product.stock_quantity > 0}
+                    onAddToOrder={handleAddToOrder}
+                  />
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* Orders Tab */}
           <TabsContent value="orders" className="space-y-6">
-            <div className="grid gap-6">
-              {mockOrders.map((order) => (
-                <OrderStatusTracker key={order.id} order={order} />
-              ))}
-            </div>
-            
-            {mockOrders.length === 0 && (
-              <Card className="glass-card text-center py-12">
-                <CardContent>
-                  <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">No orders yet</h3>
-                  <p className="text-muted-foreground mb-4">Start by ordering some fresh water</p>
-                  <Button 
-                    variant="flow" 
-                    onClick={() => setActiveTab("products")}
-                  >
-                    Browse Products
-                  </Button>
-                </CardContent>
-              </Card>
+            {isLoading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-4 text-muted-foreground">Loading orders...</p>
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-6">
+                  {orders.map((order) => (
+                    <OrderStatusTracker 
+                      key={order.id} 
+                      order={{
+                        id: order.order_number,
+                        status: order.status,
+                        timestamp: new Date(order.created_at).toLocaleDateString(),
+                        estimatedDelivery: order.status === 'delivered' ? '' : 'Today, 4:00 PM',
+                        items: order.items.map(item => ({
+                          name: item.product_name || 'Product',
+                          size: item.product_size || 'Standard',
+                          quantity: item.quantity
+                        })),
+                        total: order.total_amount
+                      }} 
+                    />
+                  ))}
+                </div>
+                
+                {orders.length === 0 && (
+                  <Card className="glass-card text-center py-12">
+                    <CardContent>
+                      <Package className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-medium mb-2">No orders yet</h3>
+                      <p className="text-muted-foreground mb-4">Start by ordering some fresh water</p>
+                      <Button 
+                        variant="flow" 
+                        onClick={() => setActiveTab("products")}
+                      >
+                        Browse Products
+                      </Button>
+                    </CardContent>
+                  </Card>
+                )}
+              </>
             )}
           </TabsContent>
 
@@ -173,22 +208,28 @@ export const UserApp = ({ onLogout }: UserAppProps) => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-primary-deep">Name</label>
-                    <p className="text-sm text-muted-foreground">Priya Sharma</p>
+                    <p className="text-sm text-muted-foreground">{user?.name || 'Not provided'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-primary-deep">Phone</label>
-                    <p className="text-sm text-muted-foreground">+91 98765 43210</p>
+                    <p className="text-sm text-muted-foreground">{user?.phone || 'Not provided'}</p>
                   </div>
                   <div className="md:col-span-2">
                     <label className="text-sm font-medium text-primary-deep">Delivery Address</label>
                     <p className="text-sm text-muted-foreground">
-                      123 Green Valley Apartments, Sector 15, New Delhi, 110001
+                      {user?.address || 'Not provided'}
                     </p>
                   </div>
                 </div>
-                <Button variant="outline" className="mt-4">
-                  Edit Profile
-                </Button>
+                <div className="flex gap-2">
+                  <Button variant="outline">
+                    Edit Profile
+                  </Button>
+                  <Button variant="destructive" onClick={logout}>
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
